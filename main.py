@@ -13,18 +13,16 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 
-class Actor:
-    @staticmethod
-    def assistant_talk(message: str):
-        with st.chat_message("assistant"):
-            st.write(message)
-            st.session_state.messages.append({"role": "assistant", "content": message})
+def assistant_talk(message: str):
+    with st.chat_message("assistant"):
+        st.write(message)
+        st.session_state.messages.append({"role": "assistant", "content": message})
 
-    @staticmethod
-    def user_talk(message: str):
-        with st.chat_message("user"):
-            st.write(message)
-            st.session_state.messages.append({"role": "user", "content": message})
+
+def user_talk(message: str):
+    with st.chat_message("user"):
+        st.write(message)
+        st.session_state.messages.append({"role": "user", "content": message})
 
     # Streamed response emulator
 
@@ -52,7 +50,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-Actor.assistant_talk(intro_messages())
+assistant_talk(intro_messages())
 
 # handle file uploads
 if uploaded_file is not None:
@@ -62,7 +60,7 @@ if uploaded_file is not None:
 # React to user input
 if prompt := st.chat_input("What is up?"):
     # Display user message in chat message container
-    Actor.user_talk(prompt)
+    user_talk(prompt)
 
     # Display assistant response in chat message container
     with st.chat_message("assistant"):
