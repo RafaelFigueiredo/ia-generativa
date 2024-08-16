@@ -8,6 +8,13 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.11"
 streamlit = "^1.37.1"
+duckdb = "^1.0.0"
+pdftotext = "^2.2.2"
+openai = "^1.41.0"
+python-dotenv = "^1.0.1"
+tiktoken = "^0.7.0"
+pandas = "^2.2.2"
+scipy = "^1.14.0"
 
 
 [tool.poetry.group.dev.dependencies]
