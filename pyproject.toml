@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "app"
+version = "0.1.0"
+description = ""
+authors = ["Rafael Figueiredo <rfigueiredo@garoa.cloud>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+streamlit = "^1.37.1"
+
+
+[tool.poetry.group.dev.dependencies]
+jupyterlab = "^4.2.4"
+black = "^24.8.0"
+isort = "^5.13.2"
+watchdog = "^4.0.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
