@@ -15,8 +15,8 @@ if "messages" not in st.session_state:
 
 def assistant_talk(message: str):
     with st.chat_message("assistant"):
-        st.write(message)
-        st.session_state.messages.append({"role": "assistant", "content": message})
+        response = st.write_stream(message)
+        st.session_state.messages.append({"role": "assistant", "content": response})
 
 
 def user_talk(message: str):
@@ -50,7 +50,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-assistant_talk(intro_messages())
+# assistant_talk(intro_messages())
 
 # handle file uploads
 if uploaded_file is not None:
@@ -64,6 +64,6 @@ if prompt := st.chat_input("What is up?"):
 
     # Display assistant response in chat message container
     with st.chat_message("assistant"):
-        response = st.write_stream(api.ask_file(prompt=prompt))
+        response = st.write_stream(api.ask_file(prompt=prompt))[0]
     # Add assistant response to chat history
     st.session_state.messages.append({"role": "assistant", "content": response})
