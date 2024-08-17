@@ -39,7 +39,7 @@ class EmbeddingsStorage:
         )
 
     def index_file(self, *, path: pathlib.Path):
-        if self._is_file_new(path):
+        if not self._is_file_new(path):
             print("file already indexed, skipping")
             return
 
