@@ -46,7 +46,9 @@ class API:
             model=GPT_MODEL, messages=messages, temperature=0, stream=True
         )
         for chunk in response:
-            yield chunk.choices[0].delta.content
+            chunk_content = chunk.choices[0].delta.content
+            if chunk_content is not None:
+                yield chunk_content
 
     def query_message(self, query: str, token_budget: int) -> str:
         """Return a message for GPT, with relevant source texts pulled from a dataframe."""
@@ -55,7 +57,7 @@ class API:
         question = f"\n\nQuestion: {query}"
         message = introduction
         for string in strings:
-            next_article = f'--------\n\n"{string}\n"'
+            next_article = f'quote from paper:\n\n"{string}\n"'
             if (
                 num_tokens(message + next_article + question, model=GPT_MODEL)
                 > token_budget
