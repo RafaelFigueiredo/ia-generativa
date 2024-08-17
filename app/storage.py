@@ -17,6 +17,7 @@ OPENAI_API_KEY = settings.OPENAI_API_KEY
 BATCH_SIZE = (
     settings.EMBEDDING_BATCH_SIZE
 )  # you can submit up to 2048 embedding inputs per request
+EMBEDDING_SIZE = settings.EMBEDDING_SIZE
 
 
 client = openai.OpenAI(api_key=OPENAI_API_KEY)
@@ -31,12 +32,18 @@ class FileMetadata:
 class EmbeddingsStorage:
     def __init__(self):
         self.db = duckdb.connect("file.db")
+        try:
+            self.db.sql('INSTALL vss; LOAD vss;')
+        except Exception as err:
+            print(f'error: {err}')
+
+        self.db.sql('SET hnsw_enable_experimental_persistence=true;')
         self.db.sql(
             "CREATE TABLE IF NOT EXISTS files (id VARCHAR PRIMARY KEY, path TEXT, content TEXT)"
         )
-        self.db.sql(
-            "CREATE TABLE IF NOT EXISTS sections (doc_id VARCHAR REFERENCES files(id), n INTEGER, content TEXT, embeddings TEXT)"
-        )
+        self.db.sql(f'CREATE TABLE IF NOT EXISTS sections (doc_id VARCHAR REFERENCES files(id), n INTEGER, content TEXT, embeddings FLOAT[{EMBEDDING_SIZE}])')
+        self.db.sql('CREATE INDEX IF NOT EXISTS idx ON sections USING HNSW (embeddings)' )
+        self.db.sql("CREATE INDEX IF NOT EXISTS idx_cos ON sections USING HNSW (embeddings) WITH (metric = 'cosine');" )
 
     def index_file(self, *, path: pathlib.Path):
         if not self._is_file_new(path):
@@ -48,32 +55,38 @@ class EmbeddingsStorage:
         self._generate_embeddings(file=file)
 
     def find_string(self, query: str) -> tuple[list[str], list[float]]:
-        df = self.db.sql("SELECT * FROM sections WHERE embeddings IS NOT NULL").df()
-
-        df["embeddings"] = df["embeddings"].apply(ast.literal_eval)
-        return self._strings_ranked_by_relatedness(query=query, df=df)
-
-    # search function
-    def _strings_ranked_by_relatedness(
-        self,
-        query: str,
-        df: pd.DataFrame,
-        relatedness_fn=lambda x, y: 1 - scipy.spatial.distance.cosine(x, y),
-        top_n: int = 100,
-    ) -> tuple[list[str], list[float]]:
-        """Returns a list of strings and relatednesses, sorted from most related to least."""
         query_embedding_response = client.embeddings.create(
             model=EMBEDDING_MODEL,
             input=query,
         )
         query_embedding = query_embedding_response.data[0].embedding
-        strings_and_relatednesses = [
-            (row["content"], relatedness_fn(query_embedding, row["embeddings"]))
-            for i, row in df.iterrows()
-        ]
-        strings_and_relatednesses.sort(key=lambda x: x[1], reverse=True)
-        strings, relatednesses = zip(*strings_and_relatednesses)
-        return strings[:top_n], relatednesses[:top_n]
+        
+        df = self.db.sql(f'''
+                SELECT *
+                FROM sections
+                ORDER BY array_cosine_similarity(embeddings, {query_embedding}::FLOAT[{EMBEDDING_SIZE}])
+                LIMIT 100;
+            ''').df()
+        strings = df['content'].to_list()
+        relatednesses = None
+        return strings, relatednesses
+
+    # # search function
+    # def _strings_ranked_by_relatedness(
+    #     self,
+    #     query_embedding: list[float],
+    #     df: pd.DataFrame,
+    #     relatedness_fn=lambda x, y: 1 - scipy.spatial.distance.cosine(x, y),
+    #     top_n: int = 100,
+    # ) -> tuple[list[str], list[float]]:
+    #     """Returns a list of strings and relatednesses, sorted from most related to least."""
+    #     strings_and_relatednesses = [
+    #         (row["content"], relatedness_fn(query_embedding, row["embeddings"]))
+    #         for i, row in df.iterrows()
+    #     ]
+    #     strings_and_relatednesses.sort(key=lambda x: x[1], reverse=True)
+    #     strings, relatednesses = zip(*strings_and_relatednesses)
+    #     return strings[:top_n], relatednesses[:top_n]
 
     def _is_file_new(self, path: pathlib.Path) -> bool:
         with open(path, "rb") as f:
@@ -84,11 +97,11 @@ class EmbeddingsStorage:
 
         response = self.db.sql(
             f"SELECT COUNT(*) FROM files WHERE id = '{content_hash}'"
-        ).fetchall()
-        if len(response) != 0:
-            return False
-        else:
+        ).fetchall()[0][0]
+        if response == 0:
             return True
+        else:
+            return False
 
     def _load_file(self, path: pathlib.Path) -> FileMetadata:
         with open(path, "rb") as f:
